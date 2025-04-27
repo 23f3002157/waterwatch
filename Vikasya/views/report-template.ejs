@@ -1,0 +1,96 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Water Issue Report</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f5f6fa; font-family: Helvetica, Arial, sans-serif; color: #2d3436; line-height: 1.6;">
+  <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #f5f6fa; padding: 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <!-- Header -->
+          <tr>
+            <td style="background-color: #0099cc; padding: 20px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: bold; color: #ffffff;">Water Issue Report</h1>
+            </td>
+          </tr>
+          <!-- Content -->
+          <tr>
+            <td style="padding: 20px;">
+              <table width="100%" border="0" cellpadding="0" cellspacing="0">
+                <!-- Report Details -->
+                <tr>
+                  <td style="padding-bottom: 15px;">
+                    <h2 style="font-size: 18px; font-weight: bold; color: #0099cc; margin: 0 0 10px 0;">Report Details</h2>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>ID:</strong> <%= sanitizedData.id %></p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Type:</strong> <%= sanitizedData.type.charAt(0).toUpperCase() + sanitizedData.type.slice(1) %></p>
+                  </td>
+                </tr>
+                <!-- Issue Summary -->
+                <tr>
+                  <td style="padding-bottom: 15px;">
+                    <h2 style="font-size: 18px; font-weight: bold; color: #0099cc; margin: 0 0 10px 0;">Issue Summary</h2>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Title:</strong> <%= sanitizedData.title %></p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Description:</strong> <%= sanitizedData.description %></p>
+                  </td>
+                </tr>
+                <!-- Location -->
+                <tr>
+                  <td style="padding-bottom: 15px;">
+                    <h2 style="font-size: 18px; font-weight: bold; color: #0099cc; margin: 0 0 10px 0;">Location</h2>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Latitude:</strong> <%= sanitizedData.location.lat %></p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Longitude:</strong> <%= sanitizedData.location.lng %></p>
+                  </td>
+                </tr>
+                <!-- Reporter Information -->
+                <tr>
+                  <td style="padding-bottom: 15px;">
+                    <h2 style="font-size: 18px; font-weight: bold; color: #0099cc; margin: 0 0 10px 0;">Reporter Information</h2>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Name:</strong> <%= sanitizedData.reporter %></p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Reported At:</strong> <%= sanitizedData.reportedAt.toLocaleString() %></p>
+                  </td>
+                </tr>
+                <!-- Water Quality -->
+                <tr>
+                  <td style="padding-bottom: 15px;">
+                    <h2 style="font-size: 18px; font-weight: bold; color: #0099cc; margin: 0 0 10px 0;">Water Quality</h2>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>pH:</strong> <%= sanitizedData.quality.ph %></p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Turbidity:</strong> <%= sanitizedData.quality.turbidity %> NTU</p>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Contaminants:</strong> <%= sanitizedData.quality.contaminants.join(", ") %></p>
+                  </td>
+                </tr>
+                <!-- Trend Data -->
+                <tr>
+                  <td style="padding-bottom: 15px;">
+                    <h2 style="font-size: 18px; font-weight: bold; color: #0099cc; margin: 0 0 10px 0;">Trend Data</h2>
+                    <p style="margin: 5px 0; font-size: 14px;"><strong>Values:</strong> <%= sanitizedData.trend.join(", ") %></p>
+                  </td>
+                </tr>
+                <!-- Media -->
+                <% if (sanitizedData.mediaUrl) { %>
+                <tr>
+                  <td style="padding-bottom: 15px;">
+                    <h2 style="font-size: 18px; font-weight: bold; color: #0099cc; margin: 0 0 10px 0;">Attached Media</h2>
+                    <img src="cid:media@waterwatch" alt="Report Media" style="max-width: 100%; height: auto; border: 1px solid #e2e8f0; border-radius: 4px;" />
+                  </td>
+                </tr>
+                <% } %>
+              </table>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 15px; text-align: center; border-top: 1px solid #e2e8f0; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280;">Community Water Watch © <%= new Date().getFullYear() %></p>
+              <p style="margin: 5px 0 0; font-size: 12px; color: #6b7280;">Automated report generated for water issue monitoring.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
