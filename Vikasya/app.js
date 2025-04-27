@@ -10,11 +10,14 @@ const sanitizeHtml = require("sanitize-html");
 const dotenv = require("dotenv");
 const fs = require("fs");
 const ejs = require("ejs");
+const { spawn } = require("child_process"); // For chatbot Python script
+const { GoogleGenerativeAI } = require("@google/generative-ai"); // For potential AI integration
 
-
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const MAP_TOKEN = process.env.MAP_TOKEN;
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, "public", "uploads");
@@ -91,6 +94,10 @@ app.get("/login", async (req, res) => {
   res.render("login");
 });
 
+app.get("/dashboard", async (req, res) => {
+  res.render("dashboard", { MAP_TOKEN });
+});
+
 app.post("/register", async (req, res) => {
   const { username, email, password } = req.body;
   try {
@@ -156,24 +163,20 @@ app.post("/report", upload.single("media"), async (req, res) => {
   } = req.body;
   const mediaPath = req.file ? `/uploads/${req.file.filename}` : "";
 
-  // Debug: Log incoming form data
   console.log("req.body:", req.body);
 
   try {
-    // Validate location data
     if (!lat || !lng) {
       console.log("Missing location data");
       return res.render("report", { emailStatus: "Missing location data (latitude or longitude)." });
     }
 
-    // Check if report ID is unique
     const existingReport = await Report.findOne({ id });
     if (existingReport) {
       console.log("Duplicate report ID:", id);
       return res.render("report", { emailStatus: "Report ID already exists." });
     }
 
-    // Hard-coded quality and trend data
     const quality = {
       ph: 6.5,
       turbidity: 30,
@@ -181,7 +184,6 @@ app.post("/report", upload.single("media"), async (req, res) => {
     };
     const trend = [80, 75, 70, 65, 60, 55, 50];
 
-    // Mock AI verification
     const aiResult = {
       verified: true,
       category: type,
@@ -213,7 +215,6 @@ app.post("/report", upload.single("media"), async (req, res) => {
     await report.save();
     console.log("Report saved:", id);
 
-    // Trigger email routing
     const sanitizedData = {
       id: sanitizeHtml(id || ""),
       type: sanitizeHtml(type || ""),
@@ -235,7 +236,6 @@ app.post("/report", upload.single("media"), async (req, res) => {
       reportedAt: new Date(),
     };
 
-    // Debug: Log sanitizedData
     console.log("sanitizedData:", sanitizedData);
 
     const reportHtml = await ejs.renderFile(
@@ -244,7 +244,6 @@ app.post("/report", upload.single("media"), async (req, res) => {
     );
     console.log("Rendered HTML:", reportHtml);
 
-    // Plain text fallback
     const plainText = `
 Water Issue Report
 
@@ -272,6 +271,8 @@ Contaminants: ${sanitizedData.quality.contaminants.join(", ")}
 Trend Data
 Values: ${sanitizedData.trend.join(", ")}
 
+${sanitizedData.mediaUrl ? "Attached Media: [Image]" : ""}
+
 Community Water Watch © ${new Date().getFullYear()}
 Automated report generated for water issue monitoring.
     `.trim();
@@ -281,13 +282,12 @@ Automated report generated for water issue monitoring.
       recipients.push("urgent@example.com");
     }
 
-    // MIME-structured email
     const mailOptions = {
       from: "no-reply@waterwatch.com",
       to: recipients.join(","),
       subject: `Water Issue Report: ${sanitizedData.title} (${sanitizedData.type})`,
-      text: plainText, // Explicit plain text part
-      html: reportHtml, // HTML part
+      text: plainText,
+      html: reportHtml,
       ...(mediaPath && {
         attachments: [
           {
@@ -313,6 +313,95 @@ Automated report generated for water issue monitoring.
     return res.render("report", { emailStatus: `Failed to process report: ${error.message}` });
   }
 });
+
+// Chat route
+app.get("/chat", (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect("/login");
+  }
+  res.render("chat", {
+    pageTitle: "Community Water Watch - Chat",
+    botName: "WaterWatchBot",
+  });
+});
+
+// Chat API endpoint
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    if (message.toLowerCase() === "clear") {
+      if (req.session.chatHistory) {
+        req.session.chatHistory = [];
+      }
+      return res.json({
+        response: "Conversation history cleared.",
+        command: "clear",
+      });
+    }
+
+    if (!req.session.chatHistory) {
+      req.session.chatHistory = [];
+    }
+
+    const response = await callPythonChatbot(message);
+
+    req.session.chatHistory.push({
+      user: message,
+      bot: response,
+    });
+
+    res.json({ response });
+  } catch (error) {
+    console.error("Chat API error:", error);
+    res.status(500).json({
+      error: "An error occurred while processing your request",
+      details: error.message,
+    });
+  }
+});
+
+// Function to call Python chatbot
+function callPythonChatbot(message) {
+  return new Promise((resolve, reject) => {
+    const pythonScript = path.join(__dirname, "chatbot", "chatbot_api.py");
+    const python = spawn("python", [pythonScript, message]);
+
+    let dataString = "";
+    let errorString = "";
+
+    python.stdout.on("data", (data) => {
+      dataString += data.toString();
+    });
+
+    python.stderr.on("data", (data) => {
+      errorString += data.toString();
+    });
+
+    python.on("close", (code) => {
+      if (code !== 0) {
+        console.error(`Python process exited with code ${code}`);
+        console.error(`Error: ${errorString}`);
+        reject(new Error(`Process exited with code ${code}: ${errorString}`));
+      } else {
+        try {
+          const result = JSON.parse(dataString);
+          resolve(result.response);
+        } catch (e) {
+          resolve(dataString.trim());
+        }
+      }
+    });
+
+    python.on("error", (err) => {
+      reject(err);
+    });
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

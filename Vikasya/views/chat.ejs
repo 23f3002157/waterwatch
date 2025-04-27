@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= pageTitle %></title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/css/chat.css" />
+  </head>
+  <body class="bg-blue-50">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+      <header
+        class="bg-blue-600 text-white p-4 rounded-t-lg shadow-lg flex items-center justify-between"
+      >
+        <div class="flex items-center">
+          <i class="fas fa-water text-3xl mr-3"></i>
+          <div>
+            <h1 class="text-xl font-bold">Community Water Watch</h1>
+            <p class="text-sm opacity-80">AI-Powered Water Quality Assistant</p>
+          </div>
+        </div>
+        <div class="buttons">
+          <button
+            id="clearBtn"
+            class="bg-blue-500 hover:bg-blue-400 px-3 py-1 rounded text-sm"
+          >
+            <i class="fas fa-broom mr-1"></i> Clear Chat
+          </button>
+        </div>
+      </header>
+
+      <div id="chatContainer" class="bg-white rounded-b-lg shadow-lg">
+        <div
+          id="chatMessages"
+          class="p-4 min-h-[500px] max-h-[500px] overflow-y-auto"
+        >
+          <!-- Messages will appear here -->
+          <div class="message bot-message">
+            <div class="message-avatar">
+              <i class="fas fa-robot"></i>
+            </div>
+            <div class="message-content">
+              <div class="message-header">
+                <span class="message-name">WaterWatchBot</span>
+                <span class="message-time">Just now</span>
+              </div>
+              <div class="message-text">
+                <p>
+                  Welcome to Community Water Watch! I'm WaterWatchBot, your AI
+                  assistant powered by Google's Gemini.
+                </p>
+                <p>
+                  How can I help you with water quality, conservation, or
+                  reporting issues today?
+                </p>
+                <p class="text-sm text-blue-600 mt-2">
+                  Type "help" for available commands.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-200 p-4 bg-gray-50">
+          <form id="chatForm" class="flex items-center">
+            <input
+              type="text"
+              id="messageInput"
+              placeholder="Type your message here..."
+              class="flex-grow px-4 py-2 rounded-l-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autocomplete="off"
+            />
+            <button
+              type="submit"
+              id="sendButton"
+              class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-r-lg transition-colors"
+            >
+              <i class="fas fa-paper-plane mr-1"></i> Send
+            </button>
+          </form>
+          <div id="statusIndicator" class="hidden mt-2 text-sm text-gray-500">
+            <i class="fas fa-circle-notch fa-spin mr-1"></i>
+            <span>WaterWatchBot is thinking...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 text-center text-gray-500 text-sm">
+        <p>
+          © 2025 Community Water Watch |
+          <a href="#" class="text-blue-600 hover:underline" id="aboutLink"
+            >About</a
+          >
+        </p>
+      </div>
+    </div>
+
+    <script src="/js/chat.js"></script>
+  </body>
+</html>

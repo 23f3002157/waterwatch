@@ -1,0 +1,1825 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Live Issue Dashboard - Community Water Watch</title>
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.2.1/dist/chart.umd.min.js"></script>
+    <style>
+      :root {
+        --primary: #0099cc;
+        --secondary: #00b894;
+        --accent: #74b9ff;
+        --light: #f5f6fa;
+        --dark: #2d3436;
+        --danger: #e74c3c;
+        --warning: #f39c12;
+        --success: #2ecc71;
+        --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        --transition: all 0.3s ease;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      body {
+        background: linear-gradient(120deg, #f5f7fa 0%, #e4f1fe 100%);
+        color: var(--dark);
+        line-height: 1.6;
+        overflow-x: hidden;
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+      }
+
+      .container {
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 0 20px;
+        height: 100%;
+      }
+
+      .header {
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        color: white;
+        padding: 1rem 0;
+        position: fixed;
+        width: 100%;
+        top: 0;
+        z-index: 1000;
+        box-shadow: var(--shadow);
+        transition: var(--transition);
+      }
+
+      .header.scrolled {
+        padding: 0.5rem 0;
+      }
+
+      .header-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.5rem;
+        font-weight: bold;
+        animation: float 3s ease-in-out infinite;
+        text-decoration: none;
+        color: white;
+      }
+
+      @keyframes float {
+        0% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-5px);
+        }
+        100% {
+          transform: translateY(0px);
+        }
+      }
+
+      nav {
+        display: flex;
+        gap: 20px;
+      }
+
+      nav a {
+        color: white;
+        text-decoration: none;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        border-radius: 30px;
+        transition: var(--transition);
+      }
+
+      nav a:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-3px);
+      }
+
+      .active {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .dashboard {
+        padding-top: 80px;
+        height: calc(100vh - 80px);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .dashboard-header {
+        padding: 20px 0;
+      }
+
+      .dashboard-title {
+        color: var(--primary);
+        margin-bottom: 10px;
+        font-size: 2rem;
+        margin-left: 20px;
+      }
+
+      .dashboard-subtitle {
+        color: var(--dark);
+        opacity: 0.8;
+        margin-bottom: 20px;
+        margin-left: 20px;
+      }
+
+      .dashboard-main {
+        display: flex;
+        gap: 20px;
+        flex: 1;
+        height: calc(100vh - 180px);
+      }
+
+      .map-container {
+        flex: 2;
+        background: white;
+        border-radius: 15px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        position: relative;
+        height: 100%;
+      }
+
+      #map {
+        width: 100%;
+        height: 100%;
+      }
+
+      .map-controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .map-control-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: white;
+        border: none;
+        box-shadow: var(--shadow);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+      }
+
+      .map-control-btn:hover {
+        transform: scale(1.1);
+      }
+
+      .sidebar {
+        flex: 1;
+        max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        height: 100%;
+        overflow-y: auto;
+      }
+
+      .card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        transition: var(--transition);
+      }
+
+      .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+      }
+
+      .card-header {
+        padding: 15px 20px;
+        background: linear-gradient(90deg, var(--primary), var(--accent));
+        color: white;
+        font-weight: 500;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .card-body {
+        padding: 20px;
+      }
+
+      .filters {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        justify-content: space-around;
+        align-items: center;
+      }
+
+      .filter-btn {
+        padding: 8px 15px;
+        border-radius: 20px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: var(--transition);
+        background: var(--light);
+        color: var(--dark);
+      }
+
+      .filter-btn.active {
+        background: var(--primary);
+        color: white;
+      }
+
+      .filter-btn:hover {
+        transform: translateY(-2px);
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+      }
+
+      .stat-item {
+        background: var(--light);
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+      }
+
+      .stat-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: var(--primary);
+        margin-bottom: 5px;
+      }
+
+      .stat-label {
+        font-size: 0.9rem;
+        color: var(--dark);
+        opacity: 0.8;
+      }
+
+      .issues-list {
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .issue-item {
+        padding: 15px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        gap: 15px;
+        align-items: center;
+      }
+
+      .issue-item:hover {
+        background: var(--light);
+      }
+
+      .issue-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+      }
+
+      .contamination {
+        background: var(--danger);
+      }
+
+      .shortage {
+        background: var(--warning);
+      }
+
+      .leakage {
+        background: var(--accent);
+      }
+
+      .flooding {
+        background: var(--primary);
+      }
+
+      .issue-content {
+        flex: 1;
+      }
+
+      .issue-title {
+        font-weight: 500;
+        margin-bottom: 5px;
+      }
+
+      .issue-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        opacity: 0.8;
+      }
+
+      .badge {
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        color: white;
+      }
+
+      .badge-pending {
+        background: var(--warning);
+      }
+
+      .badge-investigating {
+        background: var(--accent);
+      }
+
+      .badge-resolved {
+        background: var(--success);
+      }
+
+      .mapboxgl-popup-content {
+        padding: 0;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        width: 300px;
+      }
+
+      .popup-header {
+        padding: 15px;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        color: white;
+      }
+
+      .popup-title {
+        font-weight: 500;
+        font-size: 1.1rem;
+        margin-bottom: 5px;
+      }
+
+      .popup-subtitle {
+        font-size: 0.85rem;
+        opacity: 0.9;
+      }
+
+      .popup-body {
+        padding: 15px;
+      }
+
+      .popup-info {
+        margin-bottom: 15px;
+      }
+
+      .popup-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      .popup-label {
+        font-weight: 500;
+        color: var(--dark);
+      }
+
+      .popup-value {
+        color: var(--dark);
+        opacity: 0.9;
+      }
+
+      .popup-footer {
+        padding: 10px 15px;
+        background: var(--light);
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .popup-btn {
+        padding: 5px 10px;
+        border-radius: 15px;
+        border: none;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: var(--transition);
+        text-decoration: none;
+        display: inline-block;
+      }
+
+      .popup-btn-primary {
+        background: var(--primary);
+        color: white;
+      }
+
+      .popup-btn-secondary {
+        background: white;
+        color: var(--primary);
+        border: 1px solid var(--primary);
+      }
+
+      .popup-chart {
+        height: 150px;
+        margin-bottom: 15px;
+      }
+
+      .water-quality-chart {
+        background: linear-gradient(to right, #2ecc71, #f1c40f, #e74c3c);
+        height: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+        position: relative;
+      }
+
+      .water-quality-marker {
+        position: absolute;
+        top: -10px;
+        width: 12px;
+        height: 12px;
+        background: white;
+        border: 2px solid var(--dark);
+        border-radius: 50%;
+        transform: translateX(-50%);
+      }
+
+      .water-quality-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        opacity: 0.7;
+      }
+
+      .legend {
+        position: absolute;
+        bottom: 25px;
+        left: 25px;
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+        z-index: 10;
+      }
+
+      .legend-title {
+        font-weight: 500;
+        margin-bottom: 10px;
+        font-size: 0.9rem;
+      }
+
+      .legend-items {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.85rem;
+      }
+
+      .legend-color {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+      }
+
+      .trending-chart {
+        height: 250px;
+        position: relative;
+        padding-top: 20px;
+      }
+
+      /* Animation for stats */
+      @keyframes countUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .stat-item {
+        animation: countUp 0.5s ease forwards;
+        opacity: 0;
+      }
+
+      .stat-item:nth-child(1) {
+        animation-delay: 0.1s;
+      }
+      .stat-item:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .stat-item:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      .stat-item:nth-child(4) {
+        animation-delay: 0.4s;
+      }
+
+      /* Animation for water droplet */
+      @keyframes droplet {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      .water-droplet {
+        animation: droplet 2s ease infinite;
+      }
+
+      @media (max-width: 992px) {
+        .dashboard-main {
+          flex-direction: column;
+          height: auto;
+        }
+
+        .map-container {
+          height: 400px;
+        }
+
+        .sidebar {
+          max-width: 100%;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .header-content {
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        nav {
+          margin-top: 10px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+
+        .stats {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s;
+      }
+
+      .loader.hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .loader-animation {
+        width: 100px;
+        height: 100px;
+        position: relative;
+      }
+
+      .loader-animation div {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border: 10px solid transparent;
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1.2s linear infinite;
+      }
+
+      .loader-animation div:nth-child(2) {
+        border: 10px solid transparent;
+        border-bottom-color: var(--secondary);
+        animation: spin 1s linear infinite reverse;
+      }
+      /* Base styles */
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      .container {
+        max-width: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      /* Dashboard layout */
+      .dashboard-main {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100vh;
+      }
+
+      /* Map Container - Full Width */
+      .map-container {
+        width: 100%;
+        height: 50vh; /* Takes up half of the viewport height */
+        position: relative;
+        background-color: #f0f4f8; /* Placeholder background */
+      }
+
+      #map {
+        width: 100%;
+        height: 100%;
+        background-color: #e2e8f0; /* Placeholder for map */
+      }
+
+      .map-controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        z-index: 10;
+      }
+
+      .map-control-btn {
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .legend {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+        max-width: 200px;
+        z-index: 5;
+      }
+
+      .legend-title {
+        font-weight: bold;
+        margin-bottom: 8px;
+      }
+
+      .legend-items {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+      }
+
+      /* Content Container (Below Map) */
+      .content-container {
+        flex: 1;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        overflow-y: auto;
+      }
+
+      /* Cards Row Layout */
+      .cards-row {
+        display: flex;
+        gap: 20px;
+        width: 100%;
+      }
+
+      /* Card Styling */
+      .card {
+        flex: 1;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+
+      .card.full-width {
+        width: 100%;
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+        background: #f8fafc;
+        border-bottom: 1px solid #eaecef;
+        font-weight: 600;
+      }
+
+      .card-body {
+        padding: 15px 20px;
+      }
+
+      /* Statistics Grid */
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 15px;
+      }
+
+      .stat-item {
+        text-align: center;
+        padding: 10px;
+        border-radius: 6px;
+        background: #f8fafc;
+      }
+
+      .stat-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #2563eb;
+        margin-bottom: 5px;
+      }
+
+      .stat-label {
+        font-size: 0.85rem;
+        color: #64748b;
+      }
+
+      /* Chart Container */
+      .trending-chart {
+        height: 200px;
+        width: 100%;
+        background: #f8fafc;
+        border-radius: 6px;
+      }
+
+      /* Issues List */
+      .issues-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-height: 350px;
+        overflow-y: auto;
+      }
+
+      .issue-item {
+        display: flex;
+        padding: 12px;
+        border-radius: 6px;
+        background: #f8fafc;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+
+      .issue-item:hover {
+        background: #f1f5f9;
+      }
+
+      .issue-icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        margin-right: 12px;
+        font-size: 1.4rem;
+      }
+
+      .issue-icon.contamination {
+        background: rgba(231, 76, 60, 0.15);
+        color: #e74c3c;
+      }
+
+      .issue-icon.shortage {
+        background: rgba(243, 156, 18, 0.15);
+        color: #f39c12;
+      }
+
+      .issue-icon.leakage {
+        background: rgba(116, 185, 255, 0.15);
+        color: #74b9ff;
+      }
+
+      .issue-icon.flooding {
+        background: rgba(0, 153, 204, 0.15);
+        color: #0099cc;
+      }
+
+      .issue-content {
+        flex: 1;
+      }
+
+      .issue-title {
+        font-weight: 500;
+        margin-bottom: 5px;
+      }
+
+      .issue-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        color: #64748b;
+      }
+
+      .badge {
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: 600;
+      }
+
+      .badge-investigating {
+        background: #fee2e2;
+        color: #ef4444;
+      }
+
+      .badge-pending {
+        background: #fef3c7;
+        color: #f59e0b;
+      }
+
+      .badge-resolved {
+        background: #d1fae5;
+        color: #10b981;
+      }
+
+      /* Controls */
+      .refresh-btn,
+      .timeframe-select,
+      .sort-select {
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: white;
+        border: 1px solid #d1d5db;
+        cursor: pointer;
+      }
+
+      /* Responsive Adjustments */
+      @media (max-width: 992px) {
+        .cards-row {
+          flex-direction: column;
+        }
+
+        .card {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .map-container {
+          height: 40vh;
+        }
+
+        .content-container {
+          padding: 15px;
+          gap: 15px;
+        }
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      /* Improved text visibility for card headers */
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 20px;
+        background: #2d3436; /* Darker background for better contrast */
+        color: white; /* White text for better visibility */
+        font-weight: 600;
+        border-bottom: 1px solid #eaecef;
+      }
+
+      /* Improved text visibility for statistics */
+      .stat-item {
+        text-align: center;
+        padding: 15px;
+        border-radius: 6px;
+        background: #f0f4f8; /* Lighter background */
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Adding shadow for depth */
+      }
+
+      .stat-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #0099cc; /* Matching the primary color from your variables */
+        margin-bottom: 5px;
+      }
+
+      .stat-label {
+        font-size: 0.9rem;
+        color: #2d3436; /* Darker text for better readability */
+        font-weight: 500; /* Slightly bolder text */
+      }
+
+      /* Improved text visibility for issues list */
+      .issue-item {
+        display: flex;
+        padding: 15px;
+        border-radius: 6px;
+        background: white; /* White background */
+        border: 1px solid #eaecef; /* Adding border */
+        cursor: pointer;
+        transition: background 0.2s ease;
+        margin-bottom: 10px; /* Space between items */
+      }
+
+      .issue-title {
+        font-weight: 600; /* Bolder text */
+        margin-bottom: 5px;
+        color: #2d3436; /* Darker text color */
+      }
+
+      .issue-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        color: #64748b; /* More visible meta text */
+      }
+
+      /* Better visibility for badges */
+      .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1); /* Text shadow for better readability */
+      }
+
+      .badge-investigating {
+        background: #ef4444;
+        color: white;
+      }
+
+      .badge-pending {
+        background: #f59e0b;
+        color: white;
+      }
+
+      .badge-resolved {
+        background: #10b981;
+        color: white;
+      }
+
+      /* Chart area better visibility */
+      .trending-chart {
+        height: 200px;
+        width: 100%;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #eaecef;
+      }
+
+      /* Controls better visibility */
+      .refresh-btn,
+      .timeframe-select,
+      .sort-select {
+        padding: 6px 12px;
+        border-radius: 4px;
+        background: white;
+        border: 1px solid #d1d5db;
+        cursor: pointer;
+        color: #2d3436;
+        font-weight: 500;
+      }
+      .trending-chart {
+        height: 250px;
+        width: 100%;
+        position: relative;
+        padding: 10px;
+      }
+
+      canvas#waterQualityCanvas {
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Making the card body for chart a bit taller */
+      .card:not(.full-width) .card-body {
+        padding: 15px 20px;
+        height: 300px; /* Increased height to fit the chart */
+      }
+
+      /* Improved dropdown in card header */
+      .timeframe-select {
+        padding: 5px 10px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        background: white;
+        font-size: 0.85rem;
+        color: #2d3436;
+        outline: none;
+      }
+
+      .timeframe-select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(0, 153, 204, 0.2);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loading animation -->
+    <div class="loader" id="loader">
+      <div class="loader-animation">
+        <div></div>
+        <div></div>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <header class="header" id="header">
+      <div class="container header-content">
+        <a href="/" class="logo">
+          <span class="water-droplet">🌊</span> Community Water Watch
+        </a>
+        <nav>
+          <a href="/">Home</a>
+          <a href="/features">Features</a>
+          <a href="/chat-ai">Chat AI</a>
+          <a href="/dashboard" class="active">Dashboard</a>
+          <a href="/reports">My Reports</a>
+          <a href="/alerts">Alerts</a>
+          <a href="/logout">Logout</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Dashboard content -->
+    <div class="dashboard">
+      <div class="container">
+        <div class="dashboard-header">
+          <h1 class="dashboard-title">Live Issue Dashboard</h1>
+          <p class="dashboard-subtitle">
+            Real-time monitoring of water issues and quality trends in your
+            community
+          </p>
+
+          <div class="filters">
+            <button class="filter-btn active" data-filter="all">
+              All Issues
+            </button>
+            <button class="filter-btn" data-filter="contamination">
+              Contamination
+            </button>
+            <button class="filter-btn" data-filter="shortage">Shortage</button>
+            <button class="filter-btn" data-filter="leakage">Leakage</button>
+            <button class="filter-btn" data-filter="flooding">Flooding</button>
+            <button class="filter-btn" data-filter="other">Other</button>
+          </div>
+        </div>
+
+        <div class="dashboard-main">
+          <!-- Full-width Map Container -->
+          <div class="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+              <button class="map-control-btn" id="zoomIn">+</button>
+              <button class="map-control-btn" id="zoomOut">-</button>
+              <button class="map-control-btn" id="locate">📍</button>
+            </div>
+          </div>
+
+          <!-- Content Below Map -->
+          <div class="content-container">
+            <!-- First Row: Two Cards Side by Side -->
+            <div class="cards-row">
+              <!-- Overview Statistics Card -->
+              <div class="card">
+                <div class="card-header">
+                  <span>Overview Statistics</span>
+                  <button class="refresh-btn">🔄</button>
+                </div>
+                <div class="card-body">
+                  <div class="stats">
+                    <div class="stat-item">
+                      <div class="stat-value">15</div>
+                      <div class="stat-label">Active Reports</div>
+                    </div>
+                    <div class="stat-item">
+                      <div class="stat-value">3</div>
+                      <div class="stat-label">Resolved Today</div>
+                    </div>
+                    <div class="stat-item">
+                      <div class="stat-value">65%</div>
+                      <div class="stat-label">Water Quality</div>
+                    </div>
+                    <div class="stat-item">
+                      <div class="stat-value">5</div>
+                      <div class="stat-label">Critical Areas</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Water Quality Trend Card -->
+              <div class="card">
+                <div class="card-header">
+                  <span>Water Quality Trend</span>
+                </div>
+                <div class="card-body">
+                  <div class="trending-chart" id="qualityChart"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Second Row: Full Width Card -->
+            <div class="cards-row">
+              <!-- Recent Reports Card (Full Width) -->
+              <div class="card full-width">
+                <div class="card-header">
+                  <span>Recent Reports</span>
+                </div>
+                <div class="card-body issues-list">
+                  <div class="issue-item" data-id="issue1">
+                    <div class="issue-icon contamination">💧</div>
+                    <div class="issue-content">
+                      <div class="issue-title">
+                        Bellandur Lake - Foam Formation
+                      </div>
+                      <div class="issue-meta">
+                        <span>1 hour ago</span>
+                        <span class="badge badge-investigating"
+                          >Investigating</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="issue-item" data-id="issue6">
+                    <div class="issue-icon shortage">🚰</div>
+                    <div class="issue-content">
+                      <div class="issue-title">
+                        HSR Layout - Tanker Dependency
+                      </div>
+                      <div class="issue-meta">
+                        <span>4 hours ago</span>
+                        <span class="badge badge-investigating"
+                          >Investigating</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="issue-item" data-id="issue2">
+                    <div class="issue-icon shortage">🚰</div>
+                    <div class="issue-content">
+                      <div class="issue-title">
+                        Whitefield - Water Supply Low
+                      </div>
+                      <div class="issue-meta">
+                        <span>3 hours ago</span>
+                        <span class="badge badge-pending">Pending</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="issue-item" data-id="issue14">
+                    <div class="issue-icon shortage">🚰</div>
+                    <div class="issue-content">
+                      <div class="issue-title">Malleshwaram - Low Pressure</div>
+                      <div class="issue-meta">
+                        <span>3 hours ago</span>
+                        <span class="badge badge-pending">Pending</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="issue-item" data-id="issue9">
+                    <div class="issue-icon contamination">💧</div>
+                    <div class="issue-content">
+                      <div class="issue-title">Ulsoor Lake - Algae Bloom</div>
+                      <div class="issue-meta">
+                        <span>Today</span>
+                        <span class="badge badge-investigating"
+                          >Investigating</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Sample data for water issues
+      const waterIssues = [
+        {
+          id: "issue1",
+          type: "contamination",
+          title: "Bellandur Lake - Foam Formation",
+          description:
+            "Excessive foam and chemical contamination noticed in Bellandur Lake due to industrial discharge.",
+          location: { lat: 12.9352, lng: 77.6271 },
+          status: "investigating",
+          reportedAt: "1 hour ago",
+          reporter: "Environmental Watchdog",
+          quality: {
+            ph: 6.5,
+            turbidity: 30,
+            contaminants: ["Detergents", "Industrial Waste"],
+          },
+          trend: [80, 75, 70, 65, 60, 55, 50],
+        },
+        {
+          id: "issue2",
+          type: "shortage",
+          title: "Whitefield - Water Supply Low",
+          description:
+            "Low water pressure reported in Whitefield area due to maintenance at the pumping station.",
+          location: { lat: 12.9698, lng: 77.7499 },
+          status: "pending",
+          reportedAt: "3 hours ago",
+          reporter: "BWSSB",
+          quality: { ph: 7.1, turbidity: 4, contaminants: [] },
+          trend: [95, 90, 85, 80, 75, 70, 60],
+        },
+        {
+          id: "issue3",
+          type: "leakage",
+          title: "Koramangala - Pipe Leakage",
+          description:
+            "Major underground pipe leakage causing localized flooding near Forum Mall.",
+          location: { lat: 12.9345, lng: 77.6101 },
+          status: "resolved",
+          reportedAt: "Today Morning",
+          reporter: "Local Resident",
+          quality: { ph: 7.0, turbidity: 3, contaminants: [] },
+          trend: [85, 83, 80, 78, 75, 72, 71],
+        },
+        {
+          id: "issue4",
+          type: "flooding",
+          title: "Indiranagar - Street Flooding",
+          description:
+            "Heavy rains caused street-level flooding around 100 Feet Road, Indiranagar.",
+          location: { lat: 12.9716, lng: 77.6408 },
+          status: "investigating",
+          reportedAt: "Yesterday",
+          reporter: "BBMP",
+          quality: {
+            ph: 7.3,
+            turbidity: 10,
+            contaminants: ["Debris", "Organic Matter"],
+          },
+          trend: [70, 65, 60, 55, 50, 48, 45],
+        },
+        {
+          id: "issue5",
+          type: "contamination",
+          title: "Varthur Lake - Toxic Levels",
+          description:
+            "Toxic chemical contamination detected in Varthur Lake; fish mortality reported.",
+          location: { lat: 12.9387, lng: 77.7284 },
+          status: "pending",
+          reportedAt: "2 days ago",
+          reporter: "Citizen Volunteers",
+          quality: { ph: 5.8, turbidity: 35, contaminants: ["Heavy Metals"] },
+          trend: [65, 60, 55, 50, 45, 40, 30],
+        },
+        {
+          id: "issue6",
+          type: "shortage",
+          title: "HSR Layout - Tanker Dependency",
+          description:
+            "Residents report increased dependency on water tankers in Sector 2, HSR Layout.",
+          location: { lat: 12.9116, lng: 77.6412 },
+          status: "investigating",
+          reportedAt: "4 hours ago",
+          reporter: "Resident Association",
+          quality: { ph: 7.2, turbidity: 5, contaminants: [] },
+          trend: [90, 85, 80, 70, 60, 55, 50],
+        },
+        {
+          id: "issue7",
+          type: "leakage",
+          title: "JP Nagar - Pipeline Crack",
+          description:
+            "Pipeline crack near JP Nagar 6th Phase leading to minor wastage.",
+          location: { lat: 12.9012, lng: 77.5856 },
+          status: "resolved",
+          reportedAt: "Yesterday",
+          reporter: "Water Department",
+          quality: { ph: 7.0, turbidity: 2, contaminants: [] },
+          trend: [78, 76, 75, 74, 73, 72, 70],
+        },
+        {
+          id: "issue8",
+          type: "flooding",
+          title: "Kengeri - Overflowing Drain",
+          description:
+            "Heavy rains caused drains to overflow, affecting residential areas in Kengeri.",
+          location: { lat: 12.9132, lng: 77.4859 },
+          status: "investigating",
+          reportedAt: "2 days ago",
+          reporter: "Local Administration",
+          quality: {
+            ph: 7.4,
+            turbidity: 18,
+            contaminants: ["Debris", "Organic Matter"],
+          },
+          trend: [65, 60, 55, 50, 48, 45, 42],
+        },
+        {
+          id: "issue9",
+          type: "contamination",
+          title: "Ulsoor Lake - Algae Bloom",
+          description:
+            "Massive algae bloom observed in Ulsoor Lake, oxygen levels critically low.",
+          location: { lat: 12.9835, lng: 77.6209 },
+          status: "investigating",
+          reportedAt: "Today",
+          reporter: "Park Management",
+          quality: { ph: 6.0, turbidity: 22, contaminants: ["Algae"] },
+          trend: [75, 72, 70, 65, 60, 55, 50],
+        },
+        {
+          id: "issue10",
+          type: "shortage",
+          title: "Marathahalli - Water Cuts",
+          description:
+            "Intermittent water cuts reported due to low reservoir levels.",
+          location: { lat: 12.9557, lng: 77.7019 },
+          status: "pending",
+          reportedAt: "Today",
+          reporter: "BWSSB",
+          quality: { ph: 7.2, turbidity: 4, contaminants: [] },
+          trend: [95, 92, 90, 85, 80, 75, 70],
+        },
+        {
+          id: "issue11",
+          type: "leakage",
+          title: "Basavanagudi - Burst Pipe",
+          description:
+            "Old pipeline burst causing major water loss in Basavanagudi area.",
+          location: { lat: 12.9415, lng: 77.5736 },
+          status: "resolved",
+          reportedAt: "Yesterday",
+          reporter: "BBMP Engineer",
+          quality: { ph: 7.1, turbidity: 3, contaminants: [] },
+          trend: [80, 78, 76, 74, 72, 70, 68],
+        },
+        {
+          id: "issue12",
+          type: "contamination",
+          title: "Hebbal Lake - Plastic Pollution",
+          description: "High levels of plastic waste observed in Hebbal Lake.",
+          location: { lat: 13.0364, lng: 77.591 },
+          status: "pending",
+          reportedAt: "2 days ago",
+          reporter: "Citizen Volunteers",
+          quality: { ph: 6.9, turbidity: 20, contaminants: ["Plastic"] },
+          trend: [65, 63, 60, 55, 50, 48, 45],
+        },
+        {
+          id: "issue13",
+          type: "flooding",
+          title: "Electronic City - Drain Blockage",
+          description:
+            "Blocked stormwater drains causing minor flooding in Phase 1.",
+          location: { lat: 12.8397, lng: 77.679 },
+          status: "investigating",
+          reportedAt: "Yesterday",
+          reporter: "Industrial Worker",
+          quality: { ph: 7.2, turbidity: 12, contaminants: ["Debris"] },
+          trend: [75, 70, 65, 60, 58, 55, 50],
+        },
+        {
+          id: "issue14",
+          type: "shortage",
+          title: "Malleshwaram - Low Pressure",
+          description:
+            "Residents in Malleshwaram complain of low water pressure for 2 days.",
+          location: { lat: 13.0032, lng: 77.5696 },
+          status: "pending",
+          reportedAt: "3 hours ago",
+          reporter: "Local Resident",
+          quality: { ph: 7.1, turbidity: 5, contaminants: [] },
+          trend: [90, 88, 85, 80, 75, 70, 68],
+        },
+        {
+          id: "issue15",
+          type: "contamination",
+          title: "Yelahanka Lake - Fish Deaths",
+          description:
+            "Dead fish observed floating in Yelahanka Lake, suspected water toxicity.",
+          location: { lat: 13.1002, lng: 77.5967 },
+          status: "investigating",
+          reportedAt: "Today Morning",
+          reporter: "Citizen",
+          quality: {
+            ph: 5.5,
+            turbidity: 28,
+            contaminants: ["Unknown Chemicals"],
+          },
+          trend: [60, 58, 55, 50, 45, 40, 30],
+        },
+      ];
+
+      // Initialize the map when the page loads
+      document.addEventListener("DOMContentLoaded", function () {
+        // Simulate loading
+        setTimeout(() => {
+          document.getElementById("loader").classList.add("hide");
+        }, 1500);
+
+        // Initialize Mapbox
+        mapboxgl.accessToken =
+          "pk.eyJ1IjoibmlzaGNoYWxraiIsImEiOiJjbTl6MXR6MXkxY3o1MmlzN2dkZXJocTJwIn0.U-3jVTd0Se09fvXSc0TQpQ";
+        const map = new mapboxgl.Map({
+          container: "map",
+          style: "mapbox://styles/mapbox/light-v10",
+          center: [77.6271, 12.9352],
+          zoom: 12,
+        });
+
+        // Add map controls
+        document.getElementById("zoomIn").addEventListener("click", () => {
+          map.zoomIn();
+        });
+
+        document.getElementById("zoomOut").addEventListener("click", () => {
+          map.zoomOut();
+        });
+
+        document.getElementById("locate").addEventListener("click", () => {
+          // Simulate user location
+          map.flyTo({
+            center: [77.6271, 12.9352],
+            zoom: 14,
+            speed: 1.5,
+          });
+        });
+
+        // Header scroll effect
+        window.addEventListener("scroll", function () {
+          const header = document.getElementById("header");
+          if (window.scrollY > 50) {
+            header.classList.add("scrolled");
+          } else {
+            header.classList.remove("scrolled");
+          }
+        });
+
+        // Filter functionality
+        const filterButtons = document.querySelectorAll(".filter-btn");
+        filterButtons.forEach((button) => {
+          button.addEventListener("click", function () {
+            filterButtons.forEach((btn) => btn.classList.remove("active"));
+            this.classList.add("active");
+
+            const filter = this.dataset.filter;
+            filterMapMarkers(filter);
+          });
+        });
+
+        // Add markers to the map when it loads
+        map.on("load", function () {
+          addMarkersToMap(map, waterIssues);
+
+          // Initialize water quality chart
+          initializeQualityChart();
+        });
+
+        // Click functionality for issue items
+        const issueItems = document.querySelectorAll(".issue-item");
+        issueItems.forEach((item) => {
+          item.addEventListener("click", function () {
+            const issueId = this.dataset.id;
+            const issue = waterIssues.find((i) => i.id === issueId);
+
+            if (issue) {
+              map.flyTo({
+                center: [issue.location.lng, issue.location.lat],
+                zoom: 15,
+                speed: 1.5,
+              });
+
+              // Simulate clicking on the marker
+              setTimeout(() => {
+                const issueElement = document.getElementById(
+                  `marker-${issueId}`
+                );
+                if (issueElement) {
+                  issueElement.click();
+                }
+              }, 1000);
+            }
+          });
+        });
+      });
+
+      // Add markers to the map
+      function addMarkersToMap(map, issues) {
+        issues.forEach((issue) => {
+          // Create marker element
+          const markerEl = document.createElement("div");
+          markerEl.id = `marker-${issue.id}`;
+          markerEl.className = "marker";
+          markerEl.style.width = "30px";
+          markerEl.style.height = "30px";
+          markerEl.style.backgroundImage =
+            "url(https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png)";
+          markerEl.style.backgroundSize = "cover";
+          markerEl.style.cursor = "pointer";
+
+          // Create popup content
+          const popupContent = `
+            <div class="popup-header">
+              <div class="popup-title">${issue.title}</div>
+              <div class="popup-subtitle">Reported ${issue.reportedAt} by ${
+            issue.reporter
+          }</div>
+            </div>
+            <div class="popup-body">
+              <div class="popup-info">
+                <div class="popup-row">
+                  <div class="popup-label">Status</div>
+                  <div class="popup-value">${issue.status}</div>
+                </div>
+                <div class="popup-row">
+                  <div class="popup-label">pH Level</div>
+                  <div class="popup-value">${issue.quality.ph}</div>
+                </div>
+                <div class="popup-row">
+                  <div class="popup-label">Turbidity</div>
+                  <div class="popup-value">${issue.quality.turbidity} NTU</div>
+                </div>
+                <div class="popup-row">
+                  <div class="popup-label">Contaminants</div>
+                  <div class="popup-value">${issue.quality.contaminants.join(
+                    ", "
+                  )}</div>
+                </div>
+              </div>
+              <div class="water-quality-chart">
+                <div class="water-quality-marker" style="left: ${calculateMarkerPosition(
+                  issue.trend
+                )}%;"></div>
+              </div>
+              <div class="water-quality-labels">
+                <span>Good</span>
+                <span>Fair</span>
+                <span>Poor</span>
+              </div>
+              <div class="popup-footer">
+                <a href="#" class="popup-btn popup-btn-primary">View Details</a>
+                <a href="#" class="popup-btn popup-btn-secondary">Dismiss</a>
+              </div>
+            </div>
+          `;
+
+          // Add marker to the map
+          new mapboxgl.Marker(markerEl)
+            .setLngLat([issue.location.lng, issue.location.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(popupContent))
+            .addTo(map);
+        });
+      }
+
+      // Filter map markers based on selected filter
+      function filterMapMarkers(filter) {
+        const markers = document.querySelectorAll(".marker");
+        markers.forEach((marker) => {
+          const issueId = marker.id.split("-")[1];
+          const issue = waterIssues.find((i) => i.id === issueId);
+          if (filter === "all" || issue.type === filter) {
+            marker.style.display = "block";
+          } else {
+            marker.style.display = "none";
+          }
+        });
+      }
+
+      // Initialize the water quality chart
+      function initializeQualityChart() {
+        const ctx = document.getElementById("qualityChart").getContext("2d");
+        const data = {
+          labels: [
+            "Day 1",
+            "Day 2",
+            "Day 3",
+            "Day 4",
+            "Day 5",
+            "Day 6",
+            "Day 7",
+          ],
+          datasets: [
+            {
+              label: "Water Quality Index",
+              data: [75, 78, 76, 74, 72, 70, 68],
+              backgroundColor: "rgba(0, 153, 204, 0.2)",
+              borderColor: "rgba(0, 153, 204, 1)",
+              borderWidth: 1,
+              fill: true,
+            },
+          ],
+        };
+
+        const options = {
+          scales: {
+            y: {
+              beginAtZero: true,
+            },
+          },
+        };
+
+        new Chart(ctx, {
+          type: "line",
+          data: data,
+          options: options,
+        });
+      }
+
+      // Calculate marker position for water quality chart
+      function calculateMarkerPosition(trend) {
+        const max = Math.max(...trend);
+        const min = Math.min(...trend);
+        const lastValue = trend[trend.length - 1];
+        const position = ((lastValue - min) / (max - min)) * 100;
+        return position;
+      }
+      // Add this script tag below your existing script or add it to your existing script
+      document.addEventListener("DOMContentLoaded", function () {
+        // Initialize the water quality trend chart
+        initializeWaterQualityTrendChart();
+
+        // Make sure other functions in your existing code still run
+        // ...
+      });
+
+      function initializeWaterQualityTrendChart() {
+        // Check if the element exists to avoid errors
+        const chartElement = document.getElementById("qualityChart");
+        if (!chartElement) {
+          console.error("Chart element not found");
+          return;
+        }
+
+        // Create a canvas element inside the chart container
+        const canvas = document.createElement("canvas");
+        canvas.id = "waterQualityCanvas";
+        chartElement.appendChild(canvas);
+
+        // Get the canvas context for drawing
+        const ctx = canvas.getContext("2d");
+
+        // Sample data for past 7 days
+        const data = {
+          labels: [
+            "Apr 21",
+            "Apr 22",
+            "Apr 23",
+            "Apr 24",
+            "Apr 25",
+            "Apr 26",
+            "Apr 27",
+          ],
+          datasets: [
+            {
+              label: "Water Quality Index (%)",
+              data: [72, 68, 65, 67, 63, 66, 65],
+              backgroundColor: "rgba(0, 153, 204, 0.2)",
+              borderColor: "#0099cc",
+              borderWidth: 2,
+              pointBackgroundColor: "#0099cc",
+              pointRadius: 4,
+              tension: 0.3,
+              fill: true,
+            },
+            {
+              label: "Safe Threshold",
+              data: [60, 60, 60, 60, 60, 60, 60],
+              borderColor: "#2ecc71",
+              borderWidth: 2,
+              borderDashed: [5, 5],
+              pointRadius: 0,
+              fill: false,
+            },
+          ],
+        };
+
+        // Chart configuration
+        const config = {
+          type: "line",
+          data: data,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: "top",
+                labels: {
+                  usePointStyle: true,
+                  boxWidth: 6,
+                },
+              },
+              tooltip: {
+                mode: "index",
+                intersect: false,
+                backgroundColor: "rgba(45, 52, 54, 0.8)",
+              },
+            },
+            scales: {
+              y: {
+                beginAtZero: false,
+                min: 50,
+                max: 100,
+                ticks: {
+                  stepSize: 10,
+                },
+                grid: {
+                  color: "rgba(0, 0, 0, 0.05)",
+                },
+                title: {
+                  display: true,
+                  text: "Quality (%)",
+                },
+              },
+              x: {
+                grid: {
+                  display: false,
+                },
+              },
+            },
+            interaction: {
+              intersect: false,
+              mode: "nearest",
+            },
+          },
+        };
+
+        // Create the chart
+        new Chart(ctx, config);
+      }
+    </script>
+  </body>
+</html>
