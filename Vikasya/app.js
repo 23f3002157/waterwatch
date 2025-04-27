@@ -1,23 +1,24 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+const http = require("http");
 const User = require("./models/User");
 const Report = require("./models/Report");
 const path = require("path");
+const dotenv = require("dotenv");
 const session = require("express-session");
+const { spawn } = require("child_process");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const fs = require("fs");
+const ejs = require("ejs");
 const nodemailer = require("nodemailer");
 const multer = require("multer");
 const sanitizeHtml = require("sanitize-html");
-const dotenv = require("dotenv");
-const fs = require("fs");
-const ejs = require("ejs");
-const { spawn } = require("child_process"); // For chatbot Python script
-const { GoogleGenerativeAI } = require("@google/generative-ai"); // For potential AI integration
 
 dotenv.config();
 
+const MAP_TOKEN = process.env.MAP_TOKEN;
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MAP_TOKEN = process.env.MAP_TOKEN;
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, "public", "uploads");
@@ -76,9 +77,10 @@ const authorityEmails = {
 const transporter = nodemailer.createTransport({
   host: process.env.MAILHOG_HOST || "localhost",
   port: process.env.MAILHOG_PORT || 1025,
-  auth: null, // MailHog does not require authentication
+  auth: null,
 });
 
+// Routes
 app.get("/", (req, res) => {
   if (req.session.userId) {
     return res.redirect("/home");
@@ -103,10 +105,10 @@ app.post("/register", async (req, res) => {
   try {
     const user = new User({ username, email, password });
     await user.save();
-    return res.redirect("/");
+    res.redirect("/");
   } catch (err) {
     console.error(err);
-    return res.send("Error registering");
+    res.send("Error registering");
   }
 });
 
@@ -116,13 +118,13 @@ app.post("/login", async (req, res) => {
     const user = await User.findOne({ email, password });
     if (user) {
       req.session.userId = user._id;
-      return res.redirect("/home");
+      res.redirect("/home");
     } else {
-      return res.send("Invalid email or password");
+      res.send("Invalid email or password");
     }
   } catch (err) {
     console.error(err);
-    return res.send("Error logging in");
+    res.send("Error logging in");
   }
 });
 
@@ -139,12 +141,69 @@ app.get("/logout", (req, res) => {
   });
 });
 
+app.get("/chat", (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect("/login");
+  }
+  res.render("chat", {
+    pageTitle: "Community Water Watch - Chat",
+    botName: "WaterWatchBot",
+  });
+});
+
+// Chat API endpoint
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    if (message.toLowerCase() === "clear") {
+      if (req.session.chatHistory) {
+        req.session.chatHistory = [];
+      }
+      return res.json({
+        response: "Conversation history cleared.",
+        command: "clear",
+      });
+    }
+
+    if (!req.session.chatHistory) {
+      req.session.chatHistory = [];
+    }
+
+    const response = await callPythonChatbot(message);
+
+    req.session.chatHistory.push({
+      user: message,
+      bot: response,
+    });
+
+    res.json({ response });
+  } catch (error) {
+    console.error("Chat API error:", error);
+    res.status(500).json({
+      error: "An error occurred while processing your request",
+      details: error.message,
+    });
+  }
+});
+
 // Report submission route
 app.get("/report", (req, res) => {
   if (!req.session.userId) {
     return res.redirect("/login");
   }
   res.render("report", { emailStatus: null });
+});
+
+app.get("/water-reports", (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect("/login");
+  }
+  res.render("water-reports", { emailStatus: null });
 });
 
 app.post("/report", upload.single("media"), async (req, res) => {
@@ -314,95 +373,67 @@ Automated report generated for water issue monitoring.
   }
 });
 
-// Chat route
-app.get("/chat", (req, res) => {
-  if (!req.session.userId) {
-    return res.redirect("/login");
-  }
-  res.render("chat", {
-    pageTitle: "Community Water Watch - Chat",
-    botName: "WaterWatchBot",
-  });
-});
-
-// Chat API endpoint
-app.post("/api/chat", async (req, res) => {
-  try {
-    const { message } = req.body;
-
-    if (!message) {
-      return res.status(400).json({ error: "Message is required" });
-    }
-
-    if (message.toLowerCase() === "clear") {
-      if (req.session.chatHistory) {
-        req.session.chatHistory = [];
-      }
-      return res.json({
-        response: "Conversation history cleared.",
-        command: "clear",
-      });
-    }
-
-    if (!req.session.chatHistory) {
-      req.session.chatHistory = [];
-    }
-
-    const response = await callPythonChatbot(message);
-
-    req.session.chatHistory.push({
-      user: message,
-      bot: response,
-    });
-
-    res.json({ response });
-  } catch (error) {
-    console.error("Chat API error:", error);
-    res.status(500).json({
-      error: "An error occurred while processing your request",
-      details: error.message,
-    });
-  }
-});
-
 // Function to call Python chatbot
 function callPythonChatbot(message) {
   return new Promise((resolve, reject) => {
     const pythonScript = path.join(__dirname, "chatbot", "chatbot_api.py");
-    const python = spawn("python", [pythonScript, message]);
+    const pythonCommands = ["python3", "python"]; // Try python3 first, then python
+    let attemptedCommands = [];
 
-    let dataString = "";
-    let errorString = "";
-
-    python.stdout.on("data", (data) => {
-      dataString += data.toString();
-    });
-
-    python.stderr.on("data", (data) => {
-      errorString += data.toString();
-    });
-
-    python.on("close", (code) => {
-      if (code !== 0) {
-        console.error(`Python process exited with code ${code}`);
-        console.error(`Error: ${errorString}`);
-        reject(new Error(`Process exited with code ${code}: ${errorString}`));
-      } else {
-        try {
-          const result = JSON.parse(dataString);
-          resolve(result.response);
-        } catch (e) {
-          resolve(dataString.trim());
-        }
+    function tryNextPython() {
+      const pythonCommand = pythonCommands.shift();
+      if (!pythonCommand) {
+        reject(new Error(`All Python commands failed: ${attemptedCommands.join(", ")}`));
+        return;
       }
-    });
 
-    python.on("error", (err) => {
-      reject(err);
-    });
+      attemptedCommands.push(pythonCommand);
+      const python = spawn(pythonCommand, [pythonScript, message]);
+
+      let dataString = "";
+      let errorString = "";
+
+      python.stdout.on("data", (data) => {
+        dataString += data.toString();
+      });
+
+      python.stderr.on("data", (data) => {
+        errorString += data.toString();
+      });
+
+      python.on("close", (code) => {
+        if (code !== 0) {
+          console.error(`${pythonCommand} process exited with code ${code}`);
+          console.error(`Error: ${errorString}`);
+          tryNextPython(); // Try the next command if this one fails
+        } else {
+          try {
+            const result = JSON.parse(dataString);
+            resolve(result.response);
+          } catch (e) {
+            resolve(dataString.trim());
+          }
+        }
+      });
+
+      python.on("error", (err) => {
+        if (err.code === "ENOENT") {
+          console.error(`Error spawning ${pythonCommand}: ${err.message}`);
+          tryNextPython(); // Try the next command if ENOENT occurs
+        } else {
+          reject(err);
+        }
+      });
+    }
+
+    tryNextPython(); // Start the process
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+// Start server
+const server = http.createServer(app);
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
+
+module.exports = app;
